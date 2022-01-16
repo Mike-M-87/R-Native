@@ -1,182 +1,243 @@
-import { StyleSheet, Image, FlatList, Text, View, TouchableOpacity } from 'react-native';
-import { useEffect, useState, useCallback } from 'react';
+import { StyleSheet, Image, FlatList, Text, View, TouchableOpacity,Dimensions,Alert } from 'react-native';
+import { useEffect, useState, createContext,useContext} from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 
-export default function App() {
-  const [cats, setCats] = useState([])
-  const [favs, setFavs] = useState([])
-  const [ViewPage, setPage] = useState('All')
+const initialState = {
+  favourites: []
+}
 
-  const getCatsFromApi = async () => {
-    try {
-      const response = await fetch('https://api.thecatapi.com/v1/breeds?limit=20', {
-        method: 'GET',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-          // 'x-api-key': '{$$.env.cb63aaf1-e74b-45a1-ac31-5105138a21ca}'
-        }
-      })
-      const json = await response.json()
-      setCats(json)
-    } catch (error) {
-      return error
-    }
-  };
+const GlobalFavContext = createContext(initialState);
 
-  const AddFavourite = useCallback((catObject) => (event) => {
-    setFavs([
-      ...favs,
-      catObject
-    ])
-  }, [favs])
+//will be used for caching favourite images
+const FAVOURITE_KEY = 'mycoolcatsstore'
 
-  const removeFav = useCallback((favCat) => (event) => {
-    const newFavs = [...favs]
-    const idx = newFavs.findIndex(x => x.id === favCat.id);
-    newFavs.splice(idx, 1)
-    setFavs(newFavs)
-  }, [favs])
-
-  const changeView = (view) => (event) => {
-    setPage(view)
+const getCatsFromApi = async () => {
+  try {
+    const response = await fetch('https://api.thecatapi.com/v1/breeds?limit=20&q=sib', {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      }
+    })
+    const data = await response.json()
+    return data
+  } catch (error) {
+    console.log(error);
+    return []
   }
+};
 
-  useEffect(() => {
-    getCatsFromApi()
+const PetsListComponent = (props) => {
+  const [cats, setCats] = useState([])
+
+  useEffect(async () => {
+    setCats(await getCatsFromApi())
   }, [])
 
-  return (
-    <>
-      {ViewPage == "All" ?
-        (
-          <View>
-            <Text style={styles.heading}>All Cats</Text>
-            <FlatList style={styles.listContainer}
-              data={cats}
-              renderItem={({ item }) => (
-                <View style={styles.listItem} >
-                  <Image style={styles.catImage} source={{ uri: item.image.url }} />
-                  <Text style={styles.catName}>{item.name}</Text>
-                  <TouchableOpacity
-                    style={styles.likeButton}
-                    onPress={(favs.find(x => x.id == item.id)) ?
-                      removeFav({ 'id': item.id, 'name': item.name, 'img': item.image.url })
-                      : AddFavourite({ 'id': item.id, 'name': item.name, 'img': item.image.url })}>
-                    <Ionicons
-                      name={(favs.find(x => x.id == item.id)) ? 'ios-heart' : 'ios-heart-outline'}
-                      size={25}
-                      color={(favs.find(x => x.id == item.id)) ? "red" : "black"}
-                    />
-                  </TouchableOpacity>
-                </View>
-              )}
-            />
-          </View>
 
-        ) : (
 
-          <View>
-            <Text style={styles.heading}>Cats I Like</Text>
-            <FlatList style={styles.FavListContainer}
-              data={favs}
-              numColumns={2}
-              key={(itm, index) => itm + index}
-              renderItem={({ item }) => (
-                <View style={styles.FavItem}>
-                  <Image style={styles.FavCatImage} source={{ uri: item.img }} />
-                  <View style={styles.FavListItem}>
-                    <Text style={styles.FavCatName}>{item.name}</Text>
-                    <TouchableOpacity
-                      onPress={removeFav(item)}>
-                      <Ionicons name='ios-heart' size={20} color="red" />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              )}
-            />
-          </View>
-        )
-      }
+  let {favouritesList,setFavouriteArr} = useContext(GlobalFavContext)
+  const AddFavourite =  (catObject) => {
+    const isFavorite = favouritesList.find(x => x.id === catObject.id)
+    if (isFavorite) {
+      showFavouritesAlert(catObject)
+      return
+    }
 
-      <View style={styles.tabSwitch}>
-        <TouchableOpacity
-          style={ViewPage == 'All' ? '' : styles.tabButton}
-          onPress={changeView('All')}>
-          <Image style={styles.tabImage} source={require('./assets/cat.png')} />
-          <Text>All Cats</Text>
-        </TouchableOpacity>
+    let newFavs = [...favouritesList, {
+        id: catObject.id,
+        name: catObject.name,
+        img: catObject.image.url
+      }]
+      console.log(newFavs)
+    setFavouriteArr(newFavs)
 
-        <TouchableOpacity
-          style={ViewPage == 'Favourites' ? '' : styles.tabButton}
-          onPress={changeView('Favourites')}>
-          <Image style={styles.tabImage} source={require('./assets/heart.png')} />
-          <Text>Cats I Like</Text>
-        </TouchableOpacity>
+  }
 
+  const RemoveFavourite = (favCat)  => {
+    let newArr = favouritesList.filter(x => x.id !== favCat.id)
+    setFavouriteArr(newArr)
+  }
+
+
+  const showFavouritesAlert = (item) =>
+  Alert.alert(
+    "Remove Favorite",
+    "Are you sure you want to remove this favorite?",[
+      { text: "Accept", onPress: () => RemoveFavourite(item) },
+      { text: "Decline",  onPress: () => {}},
+    ]
+  );
+
+  const checkIfInFavorite = (catObject) => {
+    if(catObject != undefined){
+      return favouritesList.find(x => x.id === catObject.id)
+    }
+    return false
+  }
+
+  const renderCatItem = ({ item }) => (
+    <TouchableOpacity onPress={() => {
+      AddFavourite(item)
+    }}>
+      <View style={styles.listFlex}>
+        <Image style={styles.catImage} source={{ uri: item.image.url }} />
+        <Text style={styles.catName}>{item.name}</Text>
+        <View style={styles.details}>
+          <Ionicons name={checkIfInFavorite(item) ? 'heart':'heart-outline'} size={20} color={checkIfInFavorite(item)?"red":"grey"} style={styles.heartIcon} />
+        </View>
       </View>
-    </>
+    </TouchableOpacity>
+  );
+
+  return (
+    <View style={styles.catsTab}>
+      <FlatList
+        data={cats}
+        renderItem={renderCatItem}
+        style={styles.listContainer}
+        keyExtractor={item => item.id}
+      />
+    </View>
+  )
+}
+
+const PetsGridComponent = (props) => {
+  const {favouritesList,setFavouriteArr} = useContext(GlobalFavContext)
+
+  const RemoveFav = (favCat) => (event) => {
+    setFavouriteArr(favouritesList.filter(x => x.id !== favCat.id))
+  }
+
+  return (
+    <View style={styles.catsTab}>
+      <FlatList style={styles.listContainer}
+        data={favouritesList}
+        numColumns={2}
+        renderItem={({ item }) => (
+          <View style={styles.catTile}>
+            <Image style={styles.gridImage} source={{ uri: item.img }} />
+            <View style={styles.gridLabel}>
+              <Text style={styles.catName}>{item.name}</Text>
+              <TouchableOpacity onPress={RemoveFav(item)}>
+                  <Ionicons name='heart' size={20} color="red" style={styles.gridHeart} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        )} />
+    </View>
+  )
+}
+
+const Tab = createBottomTabNavigator()
+
+export default function App() {
+  const [favouritesList, setFavouriteArr] = useState([]);
+
+  return (
+      <NavigationContainer>
+          <GlobalFavContext.Provider value={{favouritesList,setFavouriteArr}}>
+        <Tab.Navigator>
+            <Tab.Screen name="All Cats" component={PetsListComponent}
+              options={{
+                headerTitleAlign: "left",
+                headerShadowVisible: false,
+                tabBarActiveTintColor: "black",
+                tabBarIcon: ({ focused, size }) => (
+                  <Ionicons name="logo-octocat" size={size * 1.2} color={focused ? "black" : "grey"} />
+                ),
+              }
+              }
+            />
+            <Tab.Screen name="Cats I like" component={PetsGridComponent}
+              options={{
+                headerTitleAlign: ()=>{return <View style={styles.catsTab}></View>},
+                headerShadowVisible: false,
+                tabBarActiveTintColor: "black",
+                tabBarIcon: ({ focused, size }) => (
+                  <Ionicons name="heart" size={size * 1.2} color={focused ? "black" : "grey"} />
+                ),
+              }
+              }
+            />
+        </Tab.Navigator>
+        </GlobalFavContext.Provider>
+      </NavigationContainer>
   );
 }
 
 const styles = StyleSheet.create({
+  catsTab: {
+    backgroundColor: "white",
+    width:"100%",
+    height:"100%",
+  },
 
-  tabImage: { width: 40, height: 40, margin: 'auto', },
+  listContainer: {
+  },
 
-  tabButton: { opacity: 0.2, },
+  catImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 10,
+  },
 
-  likeButton: { marginLeft: 'auto', },
-
-  tabSwitch: {
-    position: 'fixed',
-    bottom: 0,
-    width: '100%',
-    backgroundColor: 'white',
+  catItem: {
     padding: 20,
+  },
+
+  catName: {
+    fontSize: 18,
+    marginLeft: 10,
+  },
+
+  listFlex: {
     display: 'flex',
-    flexDirection: 'row',
-    justifyContent: 'space-around'
-  },
-  heading: {
-    width: '100%',
-    zIndex: 1,
-    fontSize: 42,
-    padding: 20,
-    position: 'fixed',
-    backgroundColor: 'white'
-  },
-
-  listItem: { flexDirection: 'row', alignItems: 'center', padding: 20, },
-
-  FavListContainer: { marginBottom: 100, marginTop: 100, },
-
-  FavListItem: {
-    width: '40vw',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 10,
+    marginBottom: 10,
+    marginLeft: 5,
+    marginRight: 5,
+    flexDirection: "row",
+    justifyContent: "center",
   },
 
-  FavItem: {
-    marginTop: 20,
-    flex: 1,
-    alignContent: 'center',
-    alignItems: 'center'
+  details: {
+    flex: 2,
+    display: 'flex',
+    alignItems: 'flex-end',
+    justifyContent: "center",
   },
 
-  FavCatImage: { width: '40vw', height: '40vw', borderRadius: 5, },
+  heartIcon: {
+    marginRight: 20,
+  },
 
-  FavCatName: { fontSize: 17 },
+  gridImage:{
+    alignSelf:'center',
+    width: 170,
+    height:170,
+    borderRadius: 10,
+    marginBottom:10,
+  },
+  
+  gridHeart:{
 
-  listContainer: { marginBottom: 80, marginTop: 80, },
+  },
 
-  catImage: { width: 50, height: 50, borderRadius: 10, },
+  gridLabel:{
+    display: 'flex',
+    flexDirection: "row",
+    justifyContent:"space-between",
+  },
 
-  catName: { fontSize: 20, marginLeft: 20 },
-
+  catTile:{
+    padding: 10,
+    margin:1,
+    justifyContent:'center',
+    flexDirection: 'column',
+    width: Dimensions.get('window').width / 2
+  }
 });
-
-
-
-
