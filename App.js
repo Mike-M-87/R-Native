@@ -1,4 +1,4 @@
-import { StyleSheet, Image, FlatList, Text, View, TouchableOpacity,Dimensions } from 'react-native';
+import { StyleSheet, Image, FlatList, Text, View, TouchableOpacity,Dimensions,Alert } from 'react-native';
 import { useEffect, useState, createContext,useContext} from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -10,6 +10,7 @@ const initialState = {
 
 const GlobalFavContext = createContext(initialState);
 
+//will be used for caching favourite images
 const FAVOURITE_KEY = 'mycoolcatsstore'
 
 const getCatsFromApi = async () => {
@@ -37,12 +38,12 @@ const PetsListComponent = (props) => {
   }, [])
 
 
+
   let {favouritesList,setFavouriteArr} = useContext(GlobalFavContext)
   const AddFavourite =  (catObject) => {
-    //check if cat is already in favourites
     const isFavorite = favouritesList.find(x => x.id === catObject.id)
     if (isFavorite) {
-      alert("Cat is already in favourites")
+      showFavouritesAlert(catObject)
       return
     }
 
@@ -53,16 +54,30 @@ const PetsListComponent = (props) => {
       }]
       console.log(newFavs)
     setFavouriteArr(newFavs)
+
   }
 
-  //check if the cat is already in favourites
+  const RemoveFavourite = (favCat)  => {
+    let newArr = favouritesList.filter(x => x.id !== favCat.id)
+    setFavouriteArr(newArr)
+  }
+
+
+  const showFavouritesAlert = (item) =>
+  Alert.alert(
+    "Remove Favorite",
+    "Are you sure you want to remove this favorite?",[
+      { text: "Accept", onPress: () => RemoveFavourite(item) },
+      { text: "Decline",  onPress: () => {}},
+    ]
+  );
+
   const checkIfInFavorite = (catObject) => {
     if(catObject != undefined){
       return favouritesList.find(x => x.id === catObject.id)
     }
     return false
   }
-
 
   const renderCatItem = ({ item }) => (
     <TouchableOpacity onPress={() => {
@@ -78,7 +93,6 @@ const PetsListComponent = (props) => {
     </TouchableOpacity>
   );
 
-
   return (
     <View style={styles.catsTab}>
       <FlatList
@@ -92,14 +106,11 @@ const PetsListComponent = (props) => {
 }
 
 const PetsGridComponent = (props) => {
-  const removeFav = (favCat) => (event) => {
-    const newFavs = [favs]
-    const idx = newFavs.findIndex(x => x.id === favCat.id);
-    newFavs.splice(idx, 1)
-    setFavs(newFavs)
-  }
-
   const {favouritesList,setFavouriteArr} = useContext(GlobalFavContext)
+
+  const RemoveFav = (favCat) => (event) => {
+    setFavouriteArr(favouritesList.filter(x => x.id !== favCat.id))
+  }
 
   return (
     <View style={styles.catsTab}>
@@ -111,7 +122,9 @@ const PetsGridComponent = (props) => {
             <Image style={styles.gridImage} source={{ uri: item.img }} />
             <View style={styles.gridLabel}>
               <Text style={styles.catName}>{item.name}</Text>
-              <Ionicons name='heart' size={20} color="red" style={styles.gridHeart} />
+              <TouchableOpacity onPress={RemoveFav(item)}>
+                  <Ionicons name='heart' size={20} color="red" style={styles.gridHeart} />
+              </TouchableOpacity>
             </View>
           </View>
         )} />
