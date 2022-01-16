@@ -1,6 +1,4 @@
-import { StyleSheet, Image, FlatList, Text, View } from 'react-native';
-import 'bootstrap/dist/css/bootstrap.min.css';
-import 'bootstrap/dist/js/bootstrap.bundle.min.js'
+import { StyleSheet, Image, FlatList, Text, View, TouchableOpacity } from 'react-native';
 import { useEffect, useState, useCallback } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -22,21 +20,15 @@ export default function App() {
       const json = await response.json()
       setCats(json)
     } catch (error) {
-      console.log(error);
+      return error
     }
   };
 
   const AddFavourite = useCallback((catObject) => (event) => {
-    if (!(favs.find(x => x.id === catObject.id))) {
-      setFavs([
-        ...favs,
-        {
-          id: catObject.id,
-          name: catObject.name,
-          img: catObject.image.url
-        },
-      ])
-    }
+    setFavs([
+      ...favs,
+      catObject
+    ])
   }, [favs])
 
   const removeFav = useCallback((favCat) => (event) => {
@@ -55,73 +47,136 @@ export default function App() {
   }, [])
 
   return (
-    <View>
-      
-      {
-        ViewPage == "All" ?
-          (
-            <View>
-              <h1 className='bg-light p-4 fixed-top'>All Cats</h1>
-              <FlatList style={styles.listContainer}
-                data={cats}
-                renderItem={({ item }) => (
-                  <div className="d-flex justify-content-between align-items-center p-3">
-                    <Image style={styles.catImage} source={{ uri: item.image.url }} />
-                    <Text style={styles.catName}>{item.name}</Text>
-                    <a  style={{cursor:'pointer'}}
-                       onClick={(favs.find(x => x.id == item.id)) ? removeFav({ 'id': item.id, 'name': item.name, 'img': item.image.url }) : AddFavourite(item)} >
-                      <Ionicons name={(favs.find(x => x.id == item.id)) ? 'heart' : 'heart-outline'} size={25} color="red" />
-                    </a>
-                  </div>
-                )}
-              />
-            </View>
-          ) : (
-            <View>
-              <h1 className='p-4 bg-light fixed-top'>Cats i like</h1>
-              <FlatList style={styles.listContainer}
-                data={favs}
-                renderItem={({ item }) => (
-                  <div className="d-flex justify-content-between align-items-center p-3">
-                    <Image style={styles.catImage} source={{ uri: item.img }} />
-                    <Text style={styles.catName}>{item.name}</Text>
-                    <a style={{cursor:'pointer'}}
-                      onClick={removeFav(item)}>
-                      <Ionicons name='heart' size={25} color="red" />
-                    </a>
-                  </div>
-                )}
-              />
-            </View>
-          )
+    <>
+      {ViewPage == "All" ?
+        (
+          <View>
+            <Text style={styles.heading}>All Cats</Text>
+            <FlatList style={styles.listContainer}
+              data={cats}
+              renderItem={({ item }) => (
+                <View style={styles.listItem} >
+                  <Image style={styles.catImage} source={{ uri: item.image.url }} />
+                  <Text style={styles.catName}>{item.name}</Text>
+                  <TouchableOpacity
+                    style={styles.likeButton}
+                    onPress={(favs.find(x => x.id == item.id)) ?
+                      removeFav({ 'id': item.id, 'name': item.name, 'img': item.image.url })
+                      : AddFavourite({ 'id': item.id, 'name': item.name, 'img': item.image.url })}>
+                    <Ionicons
+                      name={(favs.find(x => x.id == item.id)) ? 'ios-heart' : 'ios-heart-outline'}
+                      size={25}
+                      color={(favs.find(x => x.id == item.id)) ? "red" : "black"}
+                    />
+                  </TouchableOpacity>
+                </View>
+              )}
+            />
+          </View>
+
+        ) : (
+
+          <View>
+            <Text style={styles.heading}>Cats I Like</Text>
+            <FlatList style={styles.FavListContainer}
+              data={favs}
+              numColumns={2}
+              key={(itm, index) => itm + index}
+              renderItem={({ item }) => (
+                <View style={styles.FavItem}>
+                  <Image style={styles.FavCatImage} source={{ uri: item.img }} />
+                  <View style={styles.FavListItem}>
+                    <Text style={styles.FavCatName}>{item.name}</Text>
+                    <TouchableOpacity
+                      onPress={removeFav(item)}>
+                      <Ionicons name='ios-heart' size={20} color="red" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+            />
+          </View>
+        )
       }
-      <div className='fixed-bottom bg-light p-4 d-flex justify-content-around'>
-        <button onClick={changeView('All')} className='btn  btn-primary'>All</button>
-        <button onClick={changeView('Favourites')} className='btn btn-primary'>Fav</button>
-      </div>
-    </View>
+
+      <View style={styles.tabSwitch}>
+        <TouchableOpacity
+          style={ViewPage == 'All' ? '' : styles.tabButton}
+          onPress={changeView('All')}>
+          <Image style={styles.tabImage} source={require('./assets/cat.png')} />
+          <Text>All Cats</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={ViewPage == 'Favourites' ? '' : styles.tabButton}
+          onPress={changeView('Favourites')}>
+          <Image style={styles.tabImage} source={require('./assets/heart.png')} />
+          <Text>Cats I Like</Text>
+        </TouchableOpacity>
+
+      </View>
+    </>
   );
 }
 
-
-
 const styles = StyleSheet.create({
-  listContainer: {
-    marginBottom: 70,
-    marginTop: 70,
+
+  tabImage: { width: 40, height: 40, margin: 'auto', },
+
+  tabButton: { opacity: 0.2, },
+
+  likeButton: { marginLeft: 'auto', },
+
+  tabSwitch: {
+    position: 'fixed',
+    bottom: 0,
+    width: '100%',
+    backgroundColor: 'white',
+    padding: 20,
+    display: 'flex',
+    flexDirection: 'row',
+    justifyContent: 'space-around'
+  },
+  heading: {
+    width: '100%',
+    zIndex: 1,
+    fontSize: 42,
+    padding: 20,
+    position: 'fixed',
+    backgroundColor: 'white'
   },
 
-  catImage: {
-    width: '50px',
-    height: '50px',
-    borderRadius: '5px',
-    // marginRight: '1rem',
+  listItem: { flexDirection: 'row', alignItems: 'center', padding: 20, },
+
+  FavListContainer: { marginBottom: 100, marginTop: 100, },
+
+  FavListItem: {
+    width: '40vw',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 10,
   },
-  catItem: {
-    padding: '20%',
+
+  FavItem: {
+    marginTop: 20,
+    flex: 1,
+    alignContent: 'center',
+    alignItems: 'center'
   },
-  catName: {
-    fontSize: 'larger',
-  },
+
+  FavCatImage: { width: '40vw', height: '40vw', borderRadius: 5, },
+
+  FavCatName: { fontSize: 17 },
+
+  listContainer: { marginBottom: 80, marginTop: 80, },
+
+  catImage: { width: 50, height: 50, borderRadius: 10, },
+
+  catName: { fontSize: 20, marginLeft: 20 },
 
 });
+
+
+
+
