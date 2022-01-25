@@ -1,6 +1,8 @@
-import {Dimensions, Platform, StatusBar, StyleSheet, Text, View, FlatList, Image, TouchableOpacity } from 'react-native';
+import { Dimensions, Platform, StatusBar, StyleSheet, Text, View, FlatList, Image, TouchableOpacity } from 'react-native';
 import { useEffect, useState, useCallback } from 'react';
 import { Ionicons } from '@expo/vector-icons';
+
+let apiurl = "https://api.thecatapi.com/v1/breeds?limit=20"
 
 
 export default function App() {
@@ -8,45 +10,55 @@ export default function App() {
   const [favs, setFavs] = useState([])
   const [ViewPage, setPage] = useState('All')
 
-  const getCatsFromApi = async () => {
+  async function getCatsFromApi(path) {
     try {
-      const response = await fetch('https://api.thecatapi.com/v1/breeds?limit=30', {
+      const response = await fetch(path, {
         method: 'GET',
         headers: {
           Accept: 'application/json',
           'Content-Type': 'application/json',
-          // 'x-api-key': '{$$.env.cb63aaf1-e74b-45a1-ac31-5105138a21ca}'
         }
       })
-      const json = await response.json()
-      setCats(json)
+      const data = await response.json()
+      setCats(data)
     } catch (error) {
-      return error
+      console.log(error);
     }
   };
 
   const AddFavourite = useCallback((catObject) => (event) => {
-    setFavs([
-      ...favs,
-      catObject
-    ])
+    if (favs.find(x => x.id === catObject.id) !== undefined) {
+      setFavs(favs.filter(x => x.id !== catObject.id))
+    } else {
+      setFavs([
+        {
+          "id": catObject.id,
+          "name": catObject.name,
+          "img": catObject.image.url
+        },
+        ...favs
+      ])
+    }
   }, [favs])
 
-  const removeFav = useCallback((favCat) => (event) => {
-    const newFavs = [...favs]
-    const idx = newFavs.findIndex(x => x.id === favCat.id);
-    newFavs.splice(idx, 1)
-    setFavs(newFavs)
-  }, [favs])
+  const removeFav = (favCat) => (event) => {
+    setFavs(favs.filter(x => x.id !== favCat.id))
+  }
 
   const changeView = (view) => (event) => {
     setPage(view)
   }
 
-  useEffect(() => {
-    getCatsFromApi()
-  }, [])
+  function checkFavourite(favCat) {
+    if (favs.find(x => x.id === favCat.id)) {
+      return true
+    }
+    return false
+  }
 
+  useEffect(() => {
+    getCatsFromApi(apiurl)
+  }, [])
 
   return (
     <>
@@ -58,17 +70,15 @@ export default function App() {
             renderItem={({ item }) => (
 
               <TouchableOpacity
-                onPress={(favs.find(x => x.id == item.id)) ?
-                  removeFav({ 'id': item.id, 'name': item.name, 'img': item.image.url })
-                  : AddFavourite({ 'id': item.id, 'name': item.name, 'img': item.image.url })}>
-                <View style={styles.listItem} >
+                onPress={AddFavourite(item)}>
+                <View style={styles.listItem}>
                   <Image style={styles.catImage} source={{ uri: item.image.url }} />
                   <Text style={styles.catName}>{item.name}</Text>
                   <View style={styles.likeButton}>
                     <Ionicons
-                      name={(favs.find(x => x.id == item.id)) ? 'ios-heart' : 'ios-heart-outline'}
+                      name={checkFavourite(item) ? 'heart' : 'heart-outline'}
                       size={20}
-                      color={(favs.find(x => x.id == item.id)) ? "red" : "black"}
+                      color={checkFavourite(item) ? "red" : "grey"}
                     />
                   </View>
                 </View>
@@ -86,7 +96,7 @@ export default function App() {
             renderItem={({ item }) => (
               <View style={styles.FavItem}>
                 <Image style={styles.FavCatImage} source={{ uri: item.img }} />
-                <View style={styles.FavListItem}>
+                <View style={styles.FavDetails}>
                   <Text style={styles.FavCatName}>{item.name}</Text>
                   <TouchableOpacity
                     onPress={removeFav(item)}>
@@ -104,7 +114,7 @@ export default function App() {
         <TouchableOpacity
           onPress={changeView('All')}>
           <View style={ViewPage == 'All' ? styles.tabButton : styles.tabButtonFade}>
-            <Image style={styles.tabImage} source={require('./assets/cat.png')} />
+            <Ionicons name="logo-octocat" size={25} />
             <Text>All Cats</Text>
           </View>
         </TouchableOpacity>
@@ -112,7 +122,7 @@ export default function App() {
         <TouchableOpacity
           onPress={changeView('Favourites')}>
           <View style={ViewPage == 'Favourites' ? styles.tabButton : styles.tabButtonFade}>
-            <Image style={styles.tabImage} source={require('./assets/heart.png')} />
+            <Ionicons name='heart' size={25} />
             <Text>Cats I Like</Text>
           </View>
         </TouchableOpacity>
@@ -123,10 +133,8 @@ export default function App() {
 
 }
 
+
 const styles = StyleSheet.create({
-
-  tabImage: { width: 25, height: 25 },
-
   tabButton: { opacity: 1, alignItems: 'center' },
   tabButtonFade: { opacity: 0.2, alignItems: 'center' },
 
@@ -144,13 +152,10 @@ const styles = StyleSheet.create({
         position: 'fixed'
       }
     }),
-    // position: 'absolute',
     bottom: 0,
     width: '100%',
     backgroundColor: 'white',
-    padding: 10,
-    display: 'flex',
-    flex: 1,
+    padding: 5,
     flexDirection: 'row',
     justifyContent: 'space-around'
   },
@@ -159,34 +164,29 @@ const styles = StyleSheet.create({
     width: '100%',
     fontSize: 25,
     padding: 10,
-    alignContent: 'center',
     marginTop: StatusBar.currentHeight,
-    position: 'relative',
-    backgroundColor: StatusBar.color,
   },
 
   listItem: { flexDirection: 'row', alignItems: 'center', padding: 10, },
 
-  FavListItem: {
+  FavDetails: {
     width: '90%',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 5,
+    marginTop: 3,
   },
 
   FavItem: {
     width: '50%',
-    marginTop: 20,
-    display: 'flex',
+    marginTop: 10,
     alignItems: 'center'
   },
 
-  FavCatImage: { width: '95%', height: Dimensions.get('screen').height/5, borderRadius: 5, },
-
+  FavCatImage: { width: '95%', height: 150, borderRadius: 5, },
   FavCatName: { fontSize: 17 },
 
-  listContainer: { marginBottom: 110 + StatusBar.currentHeight, },
+  listContainer: { marginBottom: 130 },
 
   catImage: { width: 50, height: 50, borderRadius: 10, },
 
